@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skynet Taskboard</title>
+<style>
+:root{--bg:#0f0f1a;--bg2:#151528;--bg3:#1a1a2e;--bg4:#222240;--card:#1e1e36;--border:#2a2a45;--text:#e0e0f0;--text2:#a0a0c0;--muted:#606080;--accent:#6366f1;--accent2:#818cf8;--danger:#ef4444;--warn:#f59e0b;--success:#10b981;--info:#3b82f6;--radius:10px;--shadow:0 4px 20px rgba(0,0,0,.4)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',-apple-system,sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;display:flex;flex-direction:column}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;z-index:100}
+.topbar .logo{font-weight:700;font-size:1.1em;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.topbar .logo span{color:var(--accent)}
+.stats{display:flex;gap:10px;margin-left:12px}
+.stat{font-size:.8em;padding:4px 10px;border-radius:14px;background:var(--bg3);display:flex;align-items:center;gap:4px;white-space:nowrap}
+.stat .n{font-weight:700;color:var(--accent)}
+.search{flex:1;max-width:260px;margin-left:auto}
+.search input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:6px 12px;border-radius:16px;font-size:.85em;outline:none}
+.search input:focus{border-color:var(--accent)}
+.conn{display:flex;align-items:center;gap:5px;font-size:.8em;padding:4px 10px;border-radius:14px;background:var(--bg3)}
+.conn .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.conn .dot.on{background:var(--success);animation:pulse 2s infinite}
+.conn .dot.off{background:var(--danger)}
+.conn .dot.trying{background:var(--warn);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.topbtn{background:var(--accent);border:none;color:#fff;padding:6px 14px;border-radius:16px;cursor:pointer;font-weight:600;font-size:.82em;display:flex;align-items:center;gap:4px;white-space:nowrap;transition:.2s}
+.topbtn:hover{background:var(--accent2);transform:translateY(-1px)}
+.ibtn{background:none;border:1px solid var(--border);color:var(--text2);width:30px;height:30px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.9em;transition:.2s}
+.ibtn:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+.main{display:flex;flex:1;overflow:hidden}
+.sidebar{width:260px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+.sidebar-head{padding:12px;font-weight:600;font-size:.9em;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.scratch-area{flex:1;overflow-y:auto;padding:8px}
+.scratch-input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:8px;font-size:.85em;resize:vertical;min-height:80px;font-family:inherit;outline:none;margin-bottom:8px}
+.scratch-input:focus{border-color:var(--accent)}
+.scratch-input::placeholder{color:var(--muted)}
+.scratch-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:.82em;cursor:grab;transition:.2s;display:flex;align-items:center;justify-content:space-between;gap:6px}
+.scratch-card:hover{border-color:var(--accent);background:var(--bg4)}
+.scratch-card .txt{flex:1;word-break:break-word}
+.scratch-card .acts{display:flex;gap:2px;opacity:0;transition:.15s}
+.scratch-card:hover .acts{opacity:1}
+.scratch-card .acts button{background:none;border:none;color:var(--muted);cursor:pointer;font-size:.75em;padding:2px}
+.scratch-card .acts button:hover{color:var(--text)}
+
+.kanban{flex:1;display:flex;gap:12px;padding:12px;overflow-x:auto;align-items:flex-start}
+.col{min-width:270px;max-width:320px;flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);display:flex;flex-direction:column;max-height:100%}
+.col-head{padding:10px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);flex-shrink:0}
+.col-head .left{display:flex;align-items:center;gap:6px}
+.col-dot{width:8px;height:8px;border-radius:50%}
+.col-title{font-weight:600;font-size:.9em}
+.col-cnt{font-size:.72em;padding:2px 7px;border-radius:10px;background:var(--bg);color:var(--muted)}
+.col-body{flex:1;overflow-y:auto;padding:6px;min-height:60px;transition:background .2s}
+.col-body.drag-over{background:rgba(99,102,241,.08)}
+.col-add{margin:4px 6px 6px;padding:8px;text-align:center;border:1px dashed var(--border);border-radius:8px;font-size:.8em;color:var(--muted);cursor:pointer;transition:.2s}
+.col-add:hover{border-color:var(--accent);color:var(--accent)}
+
+.tcard{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:6px;cursor:grab;transition:.2s;position:relative}
+.tcard:hover{border-color:var(--accent);box-shadow:var(--shadow)}
+.tcard.dragging{opacity:.4;transform:rotate(1deg)}
+.tcard.selected{border-color:var(--accent);box-shadow:0 0 0 2px rgba(99,102,241,.3)}
+.tcard .top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px}
+.tcard .title{font-weight:600;font-size:.85em;flex:1;line-height:1.3}
+.tcard .cacts{display:flex;gap:1px;opacity:0;transition:.15s}
+.tcard:hover .cacts{opacity:1}
+.cact{background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 3px;border-radius:3px;font-size:.72em}
+.cact:hover{color:var(--text);background:var(--bg)}
+.tcard .desc{font-size:.78em;color:var(--text2);line-height:1.3;margin-bottom:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tcard .tags{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px}
+.tag{padding:1px 7px;border-radius:10px;font-size:.68em;font-weight:500}
+.tag-h{background:rgba(239,68,68,.15);color:#ef4444}.tag-m{background:rgba(245,158,11,.15);color:#f59e0b}.tag-l{background:rgba(16,185,129,.15);color:#10b981}
+.tag-model{background:rgba(59,130,246,.15);color:#3b82f6}
+.tag-custom{background:rgba(139,92,246,.15);color:#a78bfa}
+.tcard .foot{display:flex;justify-content:space-between;align-items:center;font-size:.72em;color:var(--muted)}
+.agent-dot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:3px}
+.agent-dot.running{background:var(--success);animation:pulse 1.5s infinite}
+.agent-dot.done{background:var(--info)}
+.agent-dot.fail{background:var(--danger)}
+.pbar{width:100%;height:3px;background:var(--bg);border-radius:2px;margin-top:6px;overflow:hidden}
+.pfill{height:100%;background:var(--accent);border-radius:2px;transition:width .5s}
+/* Parallel runs indicator */
+.parallel-runs{display:flex;gap:3px;margin-top:4px;flex-wrap:wrap}
+.prun{font-size:.65em;padding:2px 6px;border-radius:8px;display:flex;align-items:center;gap:3px}
+.prun.running{background:rgba(16,185,129,.12);color:var(--success)}
+.prun.done{background:rgba(59,130,246,.12);color:var(--info)}
+.prun.fail{background:rgba(239,68,68,.12);color:var(--danger)}
+
+.rpanel{width:340px;background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;transition:width .2s}
+.rpanel.hidden{width:0;overflow:hidden;border:none}
+.rpanel-head{padding:10px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+.rpanel-head h3{font-size:.9em}
+.rpanel-body{flex:1;overflow-y:auto;padding:10px;font-size:.82em}
+.rpanel-body .empty{text-align:center;padding:40px 10px;color:var(--muted)}
+.rpanel-body .empty .big{font-size:2em;margin-bottom:8px}
+.output-log{font-family:'Cascadia Code','Fira Code',monospace;font-size:.78em;line-height:1.5;white-space:pre-wrap;word-break:break-word;color:var(--text2);background:var(--bg);border-radius:8px;padding:10px;min-height:60px}
+.detail-section{margin-bottom:12px}
+.detail-section label{font-size:.75em;color:var(--muted);display:block;margin-bottom:4px}
+.detail-section .val{font-size:.85em}
+.run-tab{display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap}
+.run-tab-btn{padding:4px 10px;border-radius:6px;font-size:.75em;cursor:pointer;border:1px solid var(--border);background:var(--bg);color:var(--text2);transition:.2s}
+.run-tab-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(3px);z-index:1000;display:none;align-items:center;justify-content:center}
+.modal-bg.show{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);width:520px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow)}
+.mhead{padding:16px 20px 12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.mhead h2{font-size:1.1em}
+.mclose{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.3em}
+.mbody{padding:16px 20px}
+.frow{margin-bottom:14px}
+.frow label{display:block;font-size:.8em;font-weight:600;margin-bottom:5px;color:var(--text2)}
+.frow input,.frow textarea,.frow select{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:8px 10px;border-radius:8px;font-size:.85em;outline:none;font-family:inherit}
+.frow textarea{resize:vertical;min-height:60px}
+.frow input:focus,.frow textarea:focus,.frow select:focus{border-color:var(--accent)}
+.frow-inline{display:flex;gap:10px}
+.frow-inline .frow{flex:1}
+.optgroup{display:flex;gap:6px;flex-wrap:wrap}
+.optgroup .opt{flex:1;min-width:70px;text-align:center;padding:7px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text2);cursor:pointer;font-size:.8em;font-weight:500;transition:.2s}
+.optgroup .opt.sel{border-color:var(--accent);background:rgba(99,102,241,.12);color:var(--accent)}
+.mfoot{padding:12px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+.mfoot button{padding:8px 18px;border-radius:8px;border:none;cursor:pointer;font-weight:600;font-size:.85em;transition:.2s}
+.btn-save{background:var(--accent);color:#fff}.btn-save:hover{background:var(--accent2)}
+.btn-cancel{background:var(--bg);color:var(--text2);border:1px solid var(--border)}
+.btn-del{background:rgba(239,68,68,.12);color:var(--danger)}.btn-del:hover{background:var(--danger);color:#fff}
+
+.deploy-opts{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px}
+.deploy-opt{padding:10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);cursor:pointer;text-align:center;transition:.2s;position:relative}
+.deploy-opt.sel{border-color:var(--accent);background:rgba(99,102,241,.12)}
+.deploy-opt .mname{font-weight:600;font-size:.82em}
+.deploy-opt .msub{font-size:.68em;color:var(--muted)}
+.deploy-opt .check{position:absolute;top:4px;right:6px;font-size:.7em;display:none}
+.deploy-opt.sel .check{display:block}
+
+.ctx{position:fixed;background:var(--bg2);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow);z-index:3000;min-width:170px;padding:4px;display:none}
+.ctx.show{display:block}
+.ctx-item{padding:7px 10px;border-radius:6px;cursor:pointer;font-size:.82em;display:flex;align-items:center;gap:7px;color:var(--text2);transition:.15s}
+.ctx-item:hover{background:var(--bg);color:var(--text)}
+.ctx-item.red:hover{background:rgba(239,68,68,.1);color:var(--danger)}
+.ctx-sep{height:1px;background:var(--border);margin:3px 0}
+
+.toasts{position:fixed;top:50px;right:12px;z-index:2000;display:flex;flex-direction:column;gap:6px}
+.toast{background:var(--bg2);border:1px solid var(--border);padding:10px 14px;border-radius:8px;box-shadow:var(--shadow);font-size:.82em;display:flex;align-items:center;gap:6px;animation:slideIn .25s ease;max-width:320px}
+.toast.success{border-left:3px solid var(--success)}.toast.error{border-left:3px solid var(--danger)}.toast.warning{border-left:3px solid var(--warn)}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+
+.multi-bar{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--bg2);border:1px solid var(--accent);border-radius:12px;padding:8px 16px;display:none;align-items:center;gap:10px;box-shadow:var(--shadow);z-index:500;font-size:.85em}
+.multi-bar.show{display:flex}
+.multi-bar button{padding:6px 14px;border-radius:8px;border:none;cursor:pointer;font-weight:600;font-size:.82em}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">🤖 <span>Skynet</span> Taskboard</div>
+  <div class="stats">
+    <div class="stat">📋 <span class="n" id="sAll">0</span></div>
+    <div class="stat">⚡ <span class="n" id="sRun">0</span></div>
+    <div class="stat">✅ <span class="n" id="sDone">0</span></div>
+  </div>
+  <div class="search"><input id="searchBox" placeholder="🔍 Ara... (Ctrl+K)"></div>
+  <div class="conn" id="connStatus"><div class="dot trying"></div><span>Bağlanıyor...</span></div>
+  <button class="ibtn" onclick="togglePanel()" title="Panel">📋</button>
+  <button class="ibtn" onclick="exportData()" title="Export">📥</button>
+  <button class="ibtn" onclick="document.getElementById('impFile').click()" title="Import">📤</button>
+  <input type="file" id="impFile" accept=".json" style="display:none" onchange="importData(event)">
+  <button class="topbtn" onclick="openModal()">➕ Yeni Task</button>
+</div>
+
+<div class="main">
+  <div class="sidebar">
+    <div class="sidebar-head">💡 Scratch Pad <span style="font-size:.7em;color:var(--muted)">fikirlerini yaz</span></div>
+    <div class="scratch-area">
+      <textarea class="scratch-input" id="scratchInput" placeholder="Fikrini yaz, Enter ile ekle...&#10;Her satır bir draft task olur"></textarea>
+      <div id="scratchList"></div>
+    </div>
+  </div>
+
+  <div class="kanban" id="board"></div>
+
+  <div class="rpanel" id="rpanel">
+    <div class="rpanel-head">
+      <h3 id="rpTitle">📋 Task Detay</h3>
+      <button class="ibtn" onclick="togglePanel()" style="width:24px;height:24px;font-size:.7em">✕</button>
+    </div>
+    <div class="rpanel-body" id="rpBody">
+      <div class="empty"><div class="big">📭</div>Bir task seç</div>
+    </div>
+  </div>
+</div>
+
+<div class="multi-bar" id="multiBar">
+  <span id="multiCount">0 seçili</span>
+  <button style="background:var(--accent);color:#fff" onclick="deployMulti()">🚀 Hepsini Deploy</button>
+  <button style="background:var(--bg);color:var(--text2);border:1px solid var(--border)" onclick="clearSelection()">İptal</button>
+</div>
+
+<!-- Task Modal -->
+<div class="modal-bg" id="taskModal" onclick="if(event.target===this)closeModal()">
+<div class="modal">
+  <div class="mhead"><h2 id="mTitle">Yeni Task</h2><button class="mclose" onclick="closeModal()">&times;</button></div>
+  <div class="mbody">
+    <div class="frow"><label>Başlık *</label><input id="fTitle" maxlength="120" placeholder="Task başlığı"></div>
+    <div class="frow"><label>Açıklama</label><textarea id="fDesc" placeholder="Detaylı açıklama..."></textarea></div>
+    <div class="frow-inline">
+      <div class="frow"><label>Öncelik</label>
+        <div class="optgroup" id="fPri">
+          <div class="opt" data-v="high" onclick="selOpt(this)">🔴 Yüksek</div>
+          <div class="opt sel" data-v="medium" onclick="selOpt(this)">🟡 Orta</div>
+          <div class="opt" data-v="low" onclick="selOpt(this)">🟢 Düşük</div>
+        </div>
+      </div>
+      <div class="frow"><label>Varsayılan Model</label>
+        <select id="fModel">
+          <option value="deepseek">DeepSeek V3.2</option>
+          <option value="kimi">Kimi K2.5</option>
+          <option value="sonnet">Sonnet 4</option>
+          <option value="opus">Opus 4</option>
+          <option value="qwen">Qwen 235B</option>
+          <option value="groq">Groq Llama</option>
+        </select>
+      </div>
+    </div>
+    <div class="frow-inline">
+      <div class="frow"><label>Due Date</label><input type="date" id="fDue"></div>
+      <div class="frow"><label>Etiketler</label><input id="fTags" placeholder="api, frontend"></div>
+    </div>
+    <div class="frow"><label>Kolon</label>
+      <div class="optgroup" id="fStatus">
+        <div class="opt sel" data-v="backlog" onclick="selOpt(this)">📋 Backlog</div>
+        <div class="opt" data-v="in-progress" onclick="selOpt(this)">⚡ Progress</div>
+        <div class="opt" data-v="review" onclick="selOpt(this)">👀 Review</div>
+        <div class="opt" data-v="done" onclick="selOpt(this)">✅ Done</div>
+      </div>
+    </div>
+    <div class="frow"><label>Timeout (saniye)</label><input type="number" id="fTimeout" value="600" min="60" max="3600"></div>
+  </div>
+  <div class="mfoot">
+    <button class="btn-del" id="mDel" style="display:none" onclick="delFromModal()">🗑️ Sil</button>
+    <div style="flex:1"></div>
+    <button class="btn-cancel" onclick="closeModal()">İptal</button>
+    <button class="btn-save" onclick="saveTask()">💾 Kaydet</button>
+  </div>
+</div>
+</div>
+
+<!-- Deploy Modal (multi-model support) -->
+<div class="modal-bg" id="deployModal" onclick="if(event.target===this)closeDeployModal()">
+<div class="modal" style="width:500px">
+  <div class="mhead"><h2>🚀 Ajan Deploy</h2><button class="mclose" onclick="closeDeployModal()">&times;</button></div>
+  <div class="mbody">
+    <div class="frow"><label>Task</label><div id="dTaskTitle" style="font-weight:600"></div></div>
+    <div class="frow">
+      <label>Model Seç <span style="color:var(--accent);font-weight:400">(birden fazla seçebilirsin → paralel çalışır)</span></label>
+      <div class="deploy-opts" id="dModels">
+        <div class="deploy-opt sel" data-v="deepseek" onclick="toggleDeploy(this)"><div class="check">✓</div><div class="mname">DeepSeek V3.2</div><div class="msub">Hızlı & Ücretsiz</div></div>
+        <div class="deploy-opt" data-v="kimi" onclick="toggleDeploy(this)"><div class="check">✓</div><div class="mname">Kimi K2.5</div><div class="msub">Reasoning</div></div>
+        <div class="deploy-opt" data-v="sonnet" onclick="toggleDeploy(this)"><div class="check">✓</div><div class="mname">Sonnet 4</div><div class="msub">Dengeli</div></div>
+        <div class="deploy-opt" data-v="opus" onclick="toggleDeploy(this)"><div class="check">✓</div><div class="mname">Opus 4</div><div class="msub">Premium</div></div>
+        <div class="deploy-opt" data-v="qwen" onclick="toggleDeploy(this)"><div class="check">✓</div><div class="mname">Qwen 235B</div><div class="msub">Çok Dilli</div></div>
+        <div class="deploy-opt" data-v="groq" onclick="toggleDeploy(this)"><div class="check">✓</div><div class="mname">Groq Llama</div><div class="msub">Süper Hızlı</div></div>
+      </div>
+    </div>
+    <div class="frow"><label>Timeout (saniye)</label><input type="number" id="dTimeout" value="600" min="60" max="3600"></div>
+    <div style="font-size:.78em;color:var(--muted);margin-top:4px">💡 Birden fazla model seçersen her biri ayrı ajan olarak paralel çalışır. Sonuçları karşılaştırabilirsin.</div>
+  </div>
+  <div class="mfoot">
+    <button class="btn-cancel" onclick="closeDeployModal()">İptal</button>
+    <button class="btn-save" onclick="confirmDeploy()">🚀 Deploy Et</button>
+  </div>
+</div>
+</div>
+
+<!-- Context Menu -->
+<div class="ctx" id="ctx">
+  <div class="ctx-item" onclick="ctxDo('edit')">✏️ Düzenle</div>
+  <div class="ctx-item" onclick="ctxDo('dup')">📋 Kopyala</div>
+  <div class="ctx-item" onclick="ctxDo('deploy')">🚀 Deploy</div>
+  <div class="ctx-item" onclick="ctxDo('abort')">⛔ Tümünü Abort</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item" onclick="ctxDo('backlog')">📋 → Backlog</div>
+  <div class="ctx-item" onclick="ctxDo('in-progress')">⚡ → Progress</div>
+  <div class="ctx-item" onclick="ctxDo('review')">👀 → Review</div>
+  <div class="ctx-item" onclick="ctxDo('done')">✅ → Done</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item red" onclick="ctxDo('delete')">🗑️ Sil</div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script>
+// ══════════════════════════════════════════════
+// CONFIG & STATE
+// ══════════════════════════════════════════════
+const GW_URL = 'ws://127.0.0.1:18789';
+const GW_TOKEN = 'YOUR_GATEWAY_TOKEN_HERE';
+const COLS = [
+  {id:'backlog',title:'Backlog',icon:'📋',color:'#6366f1'},
+  {id:'in-progress',title:'In Progress',icon:'⚡',color:'#f59e0b'},
+  {id:'review',title:'Review',icon:'👀',color:'#8b5cf6'},
+  {id:'done',title:'Done',icon:'✅',color:'#10b981'}
+];
+const MODELS = {
+  deepseek: {full:'nvidia/deepseek-ai/deepseek-v3.2', label:'DeepSeek'},
+  kimi:     {full:'nvidia/moonshotai/kimi-k2.5', label:'Kimi'},
+  sonnet:   {full:'anthropic/claude-sonnet-4-20250514', label:'Sonnet'},
+  opus:     {full:'anthropic/claude-opus-4-6', label:'Opus'},
+  qwen:     {full:'nvidia/qwen/qwen3-235b-a22b', label:'Qwen'},
+  groq:     {full:'groq/llama-3.3-70b-versatile', label:'Groq'}
+};
+const SK = 'skynet-taskboard-v1';
+
+let tasks = [], scratches = [];
+let selectedIds = new Set(), editId = null, ctxId = null, deployId = null, viewId = null;
+let dragId = null;
+
+// WS state
+let ws = null, wsConnected = false, wsAuthed = false;
+let pendingReqs = {}, reqCounter = 0, reconnectTimer = null, reconnectDelay = 1000;
+let syncInterval = null;
+
+// ══════════════════════════════════════════════
+// PERSISTENCE
+// ══════════════════════════════════════════════
+function save() { localStorage.setItem(SK, JSON.stringify({tasks, scratches})) }
+function load() {
+  try {
+    const d = JSON.parse(localStorage.getItem(SK) || '{}');
+    tasks = d.tasks || []; scratches = d.scratches || [];
+    // migrate old
+    if (!tasks.length) {
+      const old = localStorage.getItem('skynet-kanban-v2') || localStorage.getItem('kanban-tasks');
+      if (old) {
+        tasks = JSON.parse(old).map(t => ({...t, runs: [], agentStatus: 'idle', timeoutSeconds: 600}));
+        save();
+      }
+    }
+    // ensure runs array
+    tasks.forEach(t => { if (!t.runs) t.runs = [] });
+  } catch(e) { tasks = []; scratches = [] }
+}
+
+// ══════════════════════════════════════════════
+// WEBSOCKET - Gateway Protocol
+// ══════════════════════════════════════════════
+function wsConnect() {
+  if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) return;
+  clearTimeout(reconnectTimer);
+  updConn('trying', 'Bağlanıyor...');
+
+  try { ws = new WebSocket(GW_URL) } catch(e) { schedReconn(); return }
+
+  ws.onopen = () => {
+    updConn('trying', 'Handshake...');
+    // Don't send connect yet - wait for challenge event or just try immediately
+    // Some gateways send challenge, some accept connect immediately
+    sendConnect();
+  };
+
+  ws.onmessage = (e) => {
+    let m;
+    try { m = JSON.parse(e.data) } catch(ex) { return }
+
+    // Handle connect challenge
+    if (m.type === 'event' && m.event === 'connect.challenge') {
+      // Gateway sent challenge, send connect now
+      sendConnect();
+      return;
+    }
+
+    // Handle responses to our requests
+    if (m.type === 'res' && m.id && pendingReqs[m.id]) {
+      const cb = pendingReqs[m.id];
+      delete pendingReqs[m.id];
+      cb(m);
+      return;
+    }
+
+    // Handle events
+    if (m.type === 'event') {
+      if (m.event === 'chat') handleChatEvent(m.payload);
+    }
+  };
+
+  ws.onclose = () => {
+    wsConnected = false; wsAuthed = false;
+    updConn('off', 'Bağlantı kesildi');
+    clearInterval(syncInterval);
+    schedReconn();
+  };
+
+  ws.onerror = () => {
+    wsConnected = false; wsAuthed = false;
+    updConn('off', 'Bağlantı hatası');
+  };
+}
+
+function sendConnect() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  if (wsAuthed) return; // already connected
+
+  const id = 'connect_' + (++reqCounter);
+  const msg = {
+    type: 'req', id, method: 'connect',
+    params: {
+      minProtocol: 3, maxProtocol: 3,
+      client: {id: 'openclaw-control-ui', version: '1.0.0', platform: 'windows', mode: 'webchat'},
+      caps: [], commands: [], permissions: {},
+      auth: {token: GW_TOKEN},
+      locale: 'tr-TR',
+      userAgent: 'skynet-taskboard/1.0.0'
+    }
+  };
+
+  pendingReqs[id] = (res) => {
+    if (res.ok) {
+      wsConnected = true; wsAuthed = true;
+      reconnectDelay = 1000;
+      updConn('on', 'Bağlı ✓');
+      toast('🟢 Gateway bağlantısı kuruldu', 'success');
+      // Start sync
+      syncSessions();
+      syncInterval = setInterval(syncSessions, 5000);
+    } else {
+      updConn('off', 'Auth hatası');
+      toast('🔴 Gateway auth hatası: ' + (res.error?.message || JSON.stringify(res.error)), 'error');
+    }
+  };
+
+  ws.send(JSON.stringify(msg));
+}
+
+function schedReconn() {
+  clearTimeout(reconnectTimer);
+  reconnectDelay = Math.min(reconnectDelay * 1.5, 30000);
+  reconnectTimer = setTimeout(wsConnect, reconnectDelay);
+}
+
+function wsSend(method, params, cb) {
+  if (!ws || ws.readyState !== WebSocket.OPEN || !wsAuthed) {
+    if (cb) cb({ok: false, error: {message: 'Not connected'}});
+    return;
+  }
+  const id = 'r' + (++reqCounter);
+  if (cb) pendingReqs[id] = cb;
+  ws.send(JSON.stringify({type: 'req', id, method, params}));
+  return id;
+}
+
+function updConn(state, text) {
+  const el = document.getElementById('connStatus');
+  const cls = state === 'on' ? 'on' : state === 'trying' ? 'trying' : 'off';
+  el.innerHTML = `<div class="dot ${cls}"></div><span>${text}</span>`;
+}
+
+// ══════════════════════════════════════════════
+// GATEWAY SYNC
+// ══════════════════════════════════════════════
+function syncSessions() {
+  wsSend('sessions.list', {}, res => {
+    if (!res.ok) return;
+    const sessions = res.payload?.sessions || res.payload || [];
+
+    tasks.forEach(t => {
+      if (!t.runs || !t.runs.length) return;
+      t.runs.forEach(run => {
+        if (run.status !== 'running') return;
+        // Check if session still exists
+        const found = sessions.find(s =>
+          (s.key || s.sessionKey || '').includes(run.label) ||
+          (s.label || '') === run.label
+        );
+        if (!found) {
+          run.status = 'completed';
+          run.completedAt = new Date().toISOString();
+        }
+      });
+      // Update overall status
+      updateTaskAgentStatus(t);
+    });
+    save(); render();
+  });
+}
+
+function updateTaskAgentStatus(t) {
+  if (!t.runs || !t.runs.length) { t.agentStatus = 'idle'; return }
+  const running = t.runs.filter(r => r.status === 'running').length;
+  const completed = t.runs.filter(r => r.status === 'completed').length;
+  const all = t.runs.length;
+  if (running > 0) t.agentStatus = 'running';
+  else if (completed === all) t.agentStatus = 'completed';
+  else t.agentStatus = 'idle';
+}
+
+// ══════════════════════════════════════════════
+// DEPLOY - sends message to main session to spawn sub-agent
+// ══════════════════════════════════════════════
+const _deployLock = {};
+function deployTaskWithModel(taskId, modelKey) {
+  const t = tasks.find(x => x.id === taskId);
+  if (!t) return;
+
+  if (!wsAuthed) {
+    toast('⚠️ Gateway bağlantısı yok, önce bağlan', 'error');
+    return;
+  }
+
+  const model = MODELS[modelKey] || MODELS.deepseek;
+  const label = 'task-' + t.id + '-' + modelKey;
+
+  // Duplicate guard: prevent re-deploy if already running
+  if (!t.runs) t.runs = [];
+  const existing = t.runs.find(r => r.label === label && r.status === 'running');
+  if (existing) {
+    toast(`⚠️ ${model.label} zaten çalışıyor`, 'error');
+    return;
+  }
+
+  // Lock guard: prevent double-click rapid fire
+  if (_deployLock[label]) return;
+  _deployLock[label] = true;
+  setTimeout(() => delete _deployLock[label], 3000);
+
+  const prompt = t.title + (t.description ? '\n\n' + t.description : '');
+
+  // Send spawn command via chat to main session
+  const message = `Şu task'ı sessions_spawn ile çalıştır. Model: ${modelKey}, label: ${label}, timeout: ${t.timeoutSeconds || 600}s. Task: ${prompt}`;
+
+  // Stable idempotency key per task+model (no Date.now)
+  const idKey = 'deploy-' + label + '-' + Math.floor(Date.now() / 5000);
+
+  wsSend('chat.send', {
+    sessionKey: 'agent:main:main',
+    message: message,
+    idempotencyKey: idKey
+  }, res => {
+    if (res.ok || res.payload) {
+      t.runs.push({
+        id: label,
+        label: label,
+        model: modelKey,
+        status: 'running',
+        startedAt: new Date().toISOString(),
+        output: ''
+      });
+      t.status = 'in-progress';
+      t.agentStatus = 'running';
+      save(); render();
+      toast(`🚀 ${model.label} deploy edildi: ${t.title}`, 'success');
+    } else {
+      delete _deployLock[label];
+      toast('Deploy hatası: ' + (res.error?.message || 'bilinmeyen'), 'error');
+    }
+  });
+}
+
+function deployTaskMultiModel(taskId, modelKeys) {
+  modelKeys.forEach(mk => deployTaskWithModel(taskId, mk));
+}
+
+function abortTask(taskId) {
+  const t = tasks.find(x => x.id === taskId);
+  if (!t) return;
+  // Abort all running runs
+  (t.runs || []).forEach(run => {
+    if (run.status === 'running' && wsAuthed) {
+      wsSend('chat.abort', {sessionKey: run.label}, () => {});
+      run.status = 'aborted';
+    }
+  });
+  t.agentStatus = 'aborted';
+  save(); render();
+  toast('⛔ Tüm ajanlar durduruldu: ' + t.title, 'warning');
+}
+
+function abortRun(taskId, runId) {
+  const t = tasks.find(x => x.id === taskId);
+  if (!t) return;
+  const run = (t.runs || []).find(r => r.id === runId);
+  if (run && run.status === 'running' && wsAuthed) {
+    wsSend('chat.abort', {sessionKey: run.label}, () => {});
+    run.status = 'aborted';
+  }
+  updateTaskAgentStatus(t);
+  save(); render();
+  toast('⛔ ' + (run?.model || '') + ' durduruldu', 'warning');
+}
+
+function handleChatEvent(payload) {
+  // Could update output in real-time
+}
+
+// ══════════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════════
+function render() {
+  const q = (document.getElementById('searchBox').value || '').toLowerCase();
+  const board = document.getElementById('board');
+  board.innerHTML = COLS.map(c => {
+    const ct = tasks.filter(t => t.status === c.id).filter(t =>
+      !q || t.title.toLowerCase().includes(q) || (t.description||'').toLowerCase().includes(q) || (t.tags||[]).some(g => g.toLowerCase().includes(q))
+    );
+    const all = tasks.filter(t => t.status === c.id);
+    return `<div class="col" data-col="${c.id}">
+      <div class="col-head"><div class="left"><div class="col-dot" style="background:${c.color}"></div><span class="col-title">${c.icon} ${c.title}</span></div><span class="col-cnt">${all.length}</span></div>
+      <div class="col-body" data-col="${c.id}" ondragover="dOver(event)" ondragleave="dLeave(event)" ondrop="dDrop(event,'${c.id}')">
+        ${ct.length ? ct.map(cardHTML).join('') : '<div style="text-align:center;padding:20px;color:var(--muted);font-size:.8em">Boş</div>'}
+      </div>
+      <div class="col-add" onclick="openModal(null,'${c.id}')">+ Kart Ekle</div>
+    </div>`;
+  }).join('');
+  renderScratches();
+  updStats();
+  updMultiBar();
+  if (viewId) showTaskDetail(viewId);
+}
+
+function cardHTML(t) {
+  const pri = t.priority === 'high' ? 'h' : t.priority === 'low' ? 'l' : 'm';
+  const sel = selectedIds.has(t.id) ? 'selected' : '';
+  const runs = t.runs || [];
+  const runningRuns = runs.filter(r => r.status === 'running');
+  const due = dueText(t.due);
+
+  let agentInfo = '';
+  if (runs.length > 0) {
+    agentInfo = '<div class="parallel-runs">' + runs.map(r => {
+      const cls = r.status === 'running' ? 'running' : r.status === 'completed' ? 'done' : 'fail';
+      const icon = r.status === 'running' ? '⚡' : r.status === 'completed' ? '✅' : '⛔';
+      return `<span class="prun ${cls}">${icon} ${MODELS[r.model]?.label || r.model}</span>`;
+    }).join('') + '</div>';
+  }
+
+  return `<div class="tcard ${sel}" data-id="${t.id}" draggable="true"
+    ondragstart="dStart(event,'${t.id}')" ondragend="dEnd(event)"
+    onclick="cardClick(event,'${t.id}')" ondblclick="openModal('${t.id}')"
+    oncontextmenu="showCtx(event,'${t.id}')">
+    <div class="top"><div class="title">${esc(t.title)}</div>
+      <div class="cacts">
+        <button class="cact" onclick="event.stopPropagation();openDeployModal('${t.id}')" title="Deploy">🚀</button>
+        ${runningRuns.length ? `<button class="cact" onclick="event.stopPropagation();abortTask('${t.id}')" title="Abort">⛔</button>` : ''}
+        <button class="cact" onclick="event.stopPropagation();openModal('${t.id}')" title="Edit">✏️</button>
+      </div>
+    </div>
+    ${t.description ? `<div class="desc">${esc(t.description)}</div>` : ''}
+    <div class="tags">
+      <span class="tag tag-${pri}">${t.priority === 'high' ? '🔴' : t.priority === 'low' ? '🟢' : '🟡'} ${t.priority}</span>
+      <span class="tag tag-model">${t.model || 'deepseek'}</span>
+      ${(t.tags || []).map(g => `<span class="tag tag-custom">${esc(g)}</span>`).join('')}
+    </div>
+    ${agentInfo}
+    <div class="foot">
+      <span>${timeAgo(t.createdAt)}</span>
+      ${due ? `<span>${due}</span>` : ''}
+    </div>
+    ${runningRuns.length ? '<div class="pbar"><div class="pfill" style="width:60%"></div></div>' : ''}
+  </div>`;
+}
+
+function renderScratches() {
+  document.getElementById('scratchList').innerHTML = scratches.map((s, i) =>
+    `<div class="scratch-card" draggable="true" ondragstart="sDragStart(event,${i})" ondragend="dEnd(event)">
+      <div class="txt">${esc(s)}</div>
+      <div class="acts">
+        <button onclick="promoteScr(${i})" title="Task yap">📋</button>
+        <button onclick="scratches.splice(${i},1);save();renderScratches()" title="Sil">✕</button>
+      </div>
+    </div>`
+  ).join('');
+}
+
+function updStats() {
+  document.getElementById('sAll').textContent = tasks.length;
+  document.getElementById('sRun').textContent = tasks.filter(t => t.agentStatus === 'running').length;
+  document.getElementById('sDone').textContent = tasks.filter(t => t.status === 'done').length;
+}
+
+// ══════════════════════════════════════════════
+// RIGHT PANEL - Task Detail with multi-run tabs
+// ══════════════════════════════════════════════
+function showTaskDetail(id) {
+  const t = tasks.find(x => x.id === id);
+  if (!t) return;
+  viewId = id;
+  document.getElementById('rpTitle').textContent = '📋 ' + t.title;
+  const b = document.getElementById('rpBody');
+  const runs = t.runs || [];
+  const statusEmoji = {idle:'⏸️',running:'🟢',completed:'✅',failed:'❌',aborted:'⛔'};
+
+  let runsHTML = '';
+  if (runs.length > 0) {
+    runsHTML = `
+      <div class="detail-section">
+        <label>Ajan Çalışmaları (${runs.length})</label>
+        ${runs.map((r, i) => `
+          <div style="background:var(--bg);border-radius:8px;padding:8px;margin-bottom:6px;border:1px solid var(--border)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+              <span style="font-weight:600;font-size:.85em">${statusEmoji[r.status]||'⏸️'} ${MODELS[r.model]?.label || r.model}</span>
+              ${r.status === 'running' ? `<button class="cact" onclick="abortRun('${t.id}','${r.id}')" style="opacity:1">⛔ Durdur</button>` : ''}
+            </div>
+            <div style="font-size:.72em;color:var(--muted)">${r.startedAt ? timeAgo(r.startedAt) + ' başladı' : ''} ${r.completedAt ? '→ ' + timeAgo(r.completedAt) + ' bitti' : ''}</div>
+            ${r.output ? `<div class="output-log" style="margin-top:6px;max-height:150px;overflow-y:auto">${esc(r.output)}</div>` : ''}
+          </div>
+        `).join('')}
+      </div>`;
+  }
+
+  b.innerHTML = `
+    <div class="detail-section"><label>Durum</label><div class="val">${statusEmoji[t.agentStatus] || '⏸️'} ${t.agentStatus || 'idle'}</div></div>
+    <div class="detail-section"><label>Model</label><div class="val">${t.model || 'deepseek'}</div></div>
+    <div class="detail-section"><label>Öncelik</label><div class="val">${t.priority === 'high' ? '🔴 Yüksek' : t.priority === 'low' ? '🟢 Düşük' : '🟡 Orta'}</div></div>
+    ${t.due ? `<div class="detail-section"><label>Due Date</label><div class="val">${t.due}</div></div>` : ''}
+    ${t.description ? `<div class="detail-section"><label>Açıklama</label><div class="val">${esc(t.description)}</div></div>` : ''}
+    ${(t.tags || []).length ? `<div class="detail-section"><label>Etiketler</label><div class="val">${t.tags.map(g => '<span class="tag tag-custom">' + esc(g) + '</span>').join(' ')}</div></div>` : ''}
+    ${runsHTML}
+    <div style="display:flex;gap:6px;margin-top:10px">
+      <button class="btn-save" style="flex:1;font-size:.8em" onclick="openDeployModal('${t.id}')">🚀 Deploy</button>
+      ${runs.some(r => r.status === 'running') ? `<button class="btn-del" style="font-size:.8em" onclick="abortTask('${t.id}')">⛔ Abort All</button>` : ''}
+      <button class="btn-cancel" style="font-size:.8em" onclick="openModal('${t.id}')">✏️</button>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════
+// SCRATCH PAD
+// ══════════════════════════════════════════════
+document.getElementById('scratchInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    const v = e.target.value.trim(); if (!v) return;
+    v.split('\n').filter(Boolean).forEach(line => scratches.push(line.trim()));
+    e.target.value = ''; save(); renderScratches();
+  }
+});
+function promoteScr(i) {
+  const title = scratches[i]; scratches.splice(i, 1);
+  tasks.push(mkTask(title)); save(); render();
+  toast('📋 Scratch → Backlog', 'success');
+}
+function sDragStart(e, i) { e.dataTransfer.setData('scratch', i); e.target.classList.add('dragging') }
+
+// ══════════════════════════════════════════════
+// DRAG & DROP
+// ══════════════════════════════════════════════
+function dStart(e, id) { dragId = id; e.dataTransfer.effectAllowed = 'move'; e.target.classList.add('dragging') }
+function dEnd(e) { e.target.classList.remove('dragging'); dragId = null }
+function dOver(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over') }
+function dLeave(e) { e.currentTarget.classList.remove('drag-over') }
+function dDrop(e, col) {
+  e.preventDefault(); e.currentTarget.classList.remove('drag-over');
+  const scrIdx = e.dataTransfer.getData('scratch');
+  if (scrIdx !== '') {
+    const idx = parseInt(scrIdx);
+    if (!isNaN(idx) && scratches[idx]) {
+      tasks.push(mkTask(scratches[idx], '', 'medium', 'deepseek', col));
+      scratches.splice(idx, 1); save(); render();
+      toast('📋 → ' + col, 'success'); return;
+    }
+  }
+  if (!dragId) return;
+  const t = tasks.find(x => x.id === dragId);
+  if (t && t.status !== col) {
+    t.status = col; t.updatedAt = new Date().toISOString();
+    if (col === 'done') t.completedAt = new Date().toISOString();
+    save(); render();
+    toast('"' + t.title + '" → ' + COLS.find(c => c.id === col)?.title, 'success');
+  }
+  dragId = null;
+}
+
+// ══════════════════════════════════════════════
+// SELECTION + MULTI
+// ══════════════════════════════════════════════
+function cardClick(e, id) {
+  if (e.ctrlKey || e.metaKey) { selectedIds.has(id) ? selectedIds.delete(id) : selectedIds.add(id); render() }
+  else if (!e.target.closest('.cacts')) { selectedIds.clear(); viewId = id; showTaskDetail(id); render() }
+}
+function clearSelection() { selectedIds.clear(); render() }
+function updMultiBar() {
+  const bar = document.getElementById('multiBar');
+  if (selectedIds.size > 1) { bar.classList.add('show'); document.getElementById('multiCount').textContent = selectedIds.size + ' seçili' }
+  else { bar.classList.remove('show') }
+}
+function deployMulti() {
+  selectedIds.forEach(id => { const t = tasks.find(x => x.id === id); if (t) deployTaskWithModel(id, t.model || 'deepseek') });
+  selectedIds.clear(); render();
+}
+function togglePanel() { document.getElementById('rpanel').classList.toggle('hidden') }
+
+// ══════════════════════════════════════════════
+// TASK MODAL
+// ══════════════════════════════════════════════
+function openModal(id, defCol) {
+  editId = id || null;
+  document.getElementById('mTitle').textContent = id ? 'Task Düzenle' : 'Yeni Task';
+  document.getElementById('mDel').style.display = id ? 'block' : 'none';
+  if (id) {
+    const t = tasks.find(x => x.id === id); if (!t) return;
+    document.getElementById('fTitle').value = t.title;
+    document.getElementById('fDesc').value = t.description || '';
+    document.getElementById('fModel').value = t.model || 'deepseek';
+    document.getElementById('fDue').value = t.due || '';
+    document.getElementById('fTags').value = (t.tags || []).join(', ');
+    document.getElementById('fTimeout').value = t.timeoutSeconds || 600;
+    setGrp('fPri', t.priority); setGrp('fStatus', t.status);
+  } else {
+    document.getElementById('fTitle').value = ''; document.getElementById('fDesc').value = '';
+    document.getElementById('fModel').value = 'deepseek'; document.getElementById('fDue').value = '';
+    document.getElementById('fTags').value = ''; document.getElementById('fTimeout').value = 600;
+    setGrp('fPri', 'medium'); setGrp('fStatus', defCol || 'backlog');
+  }
+  document.getElementById('taskModal').classList.add('show');
+  setTimeout(() => document.getElementById('fTitle').focus(), 100);
+}
+function closeModal() { document.getElementById('taskModal').classList.remove('show'); editId = null }
+function saveTask() {
+  const title = document.getElementById('fTitle').value.trim();
+  if (!title) { toast('Başlık gerekli!', 'error'); return }
+  const data = {
+    title, description: document.getElementById('fDesc').value.trim(),
+    priority: getGrp('fPri'), model: document.getElementById('fModel').value,
+    status: getGrp('fStatus'), due: document.getElementById('fDue').value || null,
+    tags: document.getElementById('fTags').value.split(',').map(s => s.trim()).filter(Boolean),
+    timeoutSeconds: parseInt(document.getElementById('fTimeout').value) || 600,
+    updatedAt: new Date().toISOString()
+  };
+  if (editId) { const i = tasks.findIndex(t => t.id === editId); if (i >= 0) tasks[i] = {...tasks[i], ...data}; toast('Güncellendi ✅', 'success') }
+  else { tasks.push({...mkTask(data.title, data.description, data.priority, data.model, data.status, data.due, data.tags, data.timeoutSeconds)}); toast('Oluşturuldu ✅', 'success') }
+  save(); render(); closeModal();
+}
+function delFromModal() { if (editId && confirm('Silinsin mi?')) { tasks = tasks.filter(t => t.id !== editId); save(); render(); closeModal(); toast('Silindi', 'warning') } }
+
+// ══════════════════════════════════════════════
+// DEPLOY MODAL - Multi-model toggle
+// ══════════════════════════════════════════════
+function openDeployModal(id) {
+  deployId = id; const t = tasks.find(x => x.id === id); if (!t) return;
+  document.getElementById('dTaskTitle').textContent = t.title;
+  document.getElementById('dTimeout').value = t.timeoutSeconds || 600;
+  // Reset: select only the task's default model
+  document.querySelectorAll('#dModels .deploy-opt').forEach(o => o.classList.toggle('sel', o.dataset.v === (t.model || 'deepseek')));
+  document.getElementById('deployModal').classList.add('show');
+}
+function closeDeployModal() { document.getElementById('deployModal').classList.remove('show'); deployId = null }
+function toggleDeploy(el) {
+  el.classList.toggle('sel');
+  // Ensure at least one is selected
+  const selected = document.querySelectorAll('#dModels .deploy-opt.sel');
+  if (selected.length === 0) el.classList.add('sel');
+}
+function confirmDeploy() {
+  if (!deployId) return;
+  const models = Array.from(document.querySelectorAll('#dModels .deploy-opt.sel')).map(o => o.dataset.v);
+  const timeout = parseInt(document.getElementById('dTimeout').value) || 600;
+  const t = tasks.find(x => x.id === deployId);
+  if (t) t.timeoutSeconds = timeout;
+
+  if (models.length === 1) {
+    deployTaskWithModel(deployId, models[0]);
+  } else {
+    deployTaskMultiModel(deployId, models);
+    toast(`🚀 ${models.length} model paralel deploy edildi!`, 'success');
+  }
+  closeDeployModal();
+}
+
+// ══════════════════════════════════════════════
+// CONTEXT MENU
+// ══════════════════════════════════════════════
+function showCtx(e, id) { e.preventDefault(); ctxId = id; const m = document.getElementById('ctx'); m.style.left = e.clientX + 'px'; m.style.top = e.clientY + 'px'; m.classList.add('show') }
+function hideCtx() { document.getElementById('ctx').classList.remove('show'); ctxId = null }
+function ctxDo(action) {
+  const t = tasks.find(x => x.id === ctxId); if (!t) { hideCtx(); return }
+  if (action === 'edit') openModal(t.id);
+  else if (action === 'dup') { tasks.push({...t, id: uid(), title: t.title + ' (kopya)', createdAt: new Date().toISOString(), runs: [], agentStatus: 'idle'}); save(); render(); toast('Kopyalandı', 'success') }
+  else if (action === 'deploy') openDeployModal(t.id);
+  else if (action === 'abort') abortTask(t.id);
+  else if (action === 'delete') { tasks = tasks.filter(x => x.id !== t.id); save(); render(); toast('Silindi', 'warning') }
+  else if (['backlog', 'in-progress', 'review', 'done'].includes(action)) { t.status = action; t.updatedAt = new Date().toISOString(); save(); render(); toast('→ ' + action, 'success') }
+  hideCtx();
+}
+document.addEventListener('click', hideCtx);
+
+// ══════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════
+function mkTask(title, desc, pri, model, status, due, tags, timeout) {
+  return {id: uid(), title: title || '', description: desc || '', priority: pri || 'medium', model: model || 'deepseek',
+    status: status || 'backlog', due: due || null, tags: tags || [],
+    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    runs: [], agentStatus: 'idle', timeoutSeconds: timeout || 600}
+}
+function uid() { return 'task_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6) }
+function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML }
+function timeAgo(iso) { if (!iso) return ''; const d = (Date.now() - new Date(iso).getTime()) / 1000; if (d < 60) return 'az önce'; if (d < 3600) return Math.floor(d / 60) + 'dk'; if (d < 86400) return Math.floor(d / 3600) + 'sa'; return Math.floor(d / 86400) + 'g' }
+function dueText(due) { if (!due) return ''; const d = (new Date(due).getTime() - Date.now()) / 864e5; if (d < 0) return '🔴 ' + Math.abs(Math.ceil(d)) + 'g gecikmiş'; if (d < 1) return '🟡 Bugün'; if (d < 2) return '🟡 Yarın'; return '📅 ' + new Date(due).toLocaleDateString('tr-TR', {day: 'numeric', month: 'short'}) }
+function selOpt(el) { el.parentElement.querySelectorAll('.opt').forEach(o => o.classList.remove('sel')); el.classList.add('sel') }
+function getGrp(id) { return document.getElementById(id).querySelector('.sel')?.dataset.v }
+function setGrp(id, v) { document.getElementById(id).querySelectorAll('.opt').forEach(o => o.classList.toggle('sel', o.dataset.v === v)) }
+function toast(msg, type) { const c = document.getElementById('toasts'), el = document.createElement('div'); el.className = 'toast ' + (type || 'success'); el.textContent = msg; c.appendChild(el); setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300) }, 3000) }
+function exportData() { const b = new Blob([JSON.stringify({tasks, scratches}, null, 2)], {type: 'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'skynet-taskboard-' + new Date().toISOString().slice(0, 10) + '.json'; a.click(); toast('Export tamamlandı', 'success') }
+function importData(e) { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => { try { const d = JSON.parse(r.result); tasks = d.tasks || d; scratches = d.scratches || []; tasks.forEach(t => { if (!t.runs) t.runs = [] }); save(); render(); toast(tasks.length + ' task import edildi', 'success') } catch (err) { toast('Import hatası', 'error') } }; r.readAsText(f); e.target.value = '' }
+
+// ══════════════════════════════════════════════
+// KEYBOARD
+// ══════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { closeModal(); closeDeployModal(); hideCtx() }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); document.getElementById('searchBox').focus() }
+  const tag = document.activeElement.tagName;
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
+  if (e.key === 'n') { e.preventDefault(); openModal() }
+  if (e.key === 'd' && viewId) { e.preventDefault(); openDeployModal(viewId) }
+  if (e.key === 'x' && viewId) { e.preventDefault(); abortTask(viewId) }
+});
+document.getElementById('searchBox').addEventListener('input', () => render());
+
+// ══════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════
+load();
+render();
+wsConnect();
+</script>
+</body>
+</html>
