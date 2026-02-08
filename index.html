@@ -507,11 +507,13 @@ function deployTaskWithModel(taskId, modelKey) {
   }
 
   const model = MODELS[modelKey] || MODELS.deepseek;
-  const label = 'task-' + t.id + '-' + modelKey;
+  // Readable label: task title (cleaned) + model name
+  const cleanTitle = t.title.replace(/[^a-zA-Z0-9\u00e0-\u024f\u0100-\u017f ]/gi, '').trim().replace(/\s+/g, '-').substring(0, 30).replace(/-+$/, '').toLowerCase();
+  const label = (cleanTitle || 'task') + '-' + modelKey;
 
   // Duplicate guard: prevent re-deploy if already running
   if (!t.runs) t.runs = [];
-  const existing = t.runs.find(r => r.label === label && r.status === 'running');
+  const existing = t.runs.find(r => r.model === modelKey && r.status === 'running');
   if (existing) {
     toast(`⚠️ ${model.label} zaten çalışıyor`, 'error');
     return;
@@ -524,8 +526,8 @@ function deployTaskWithModel(taskId, modelKey) {
 
   const prompt = t.title + (t.description ? '\n\n' + t.description : '');
 
-  // Send spawn command via chat to main session
-  const message = `Şu task'ı sessions_spawn ile çalıştır. Model: ${modelKey}, label: ${label}, timeout: ${t.timeoutSeconds || 600}s. Task: ${prompt}`;
+  // Send spawn command via chat to main session — cleanup=delete removes session after completion
+  const message = `Şu task'ı sessions_spawn ile çalıştır. Model: ${modelKey}, label: ${label}, cleanup: delete, timeout: ${t.timeoutSeconds || 600}s. Task: ${prompt}`;
 
   // Stable idempotency key per task+model (no Date.now)
   const idKey = 'deploy-' + label + '-' + Math.floor(Date.now() / 5000);
